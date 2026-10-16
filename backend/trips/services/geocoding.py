@@ -1,5 +1,7 @@
 """Convert a place name into coordinates using OpenStreetMap Nominatim."""
 import os
+import threading
+import time
 from functools import lru_cache
 
 import requests
@@ -12,14 +14,29 @@ DEFAULT_USER_AGENT = (
     "(+https://github.com/Achref47/spotter-weather-routing)"
 )
 TIMEOUT_S = 10
+MIN_INTERVAL_S = 1.0  # Nominatim's public service allows about 1 request/second
+
+_last_call = 0.0
+_lock = threading.Lock()
 
 
 def _user_agent() -> str:
     return os.environ.get("NOMINATIM_USER_AGENT", DEFAULT_USER_AGENT)
 
 
+def _throttle() -> None:
+    """Keep real network lookups at least MIN_INTERVAL_S apart."""
+    global _last_call
+    with _lock:
+        wait = MIN_INTERVAL_S - (time.monotonic() - _last_call)
+        if wait > 0:
+            time.sleep(wait)
+        _last_call = time.monotonic()
+
+
 @lru_cache(maxsize=256)
 def _lookup(query: str) -> tuple:
+    _throttle()
     try:
         resp = requests.get(
             NOMINATIM_URL,

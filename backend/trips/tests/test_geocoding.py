@@ -18,9 +18,14 @@ class FakeResp:
         return self.payload
 
 
+
+REAL_THROTTLE = geocoding._throttle
+
+
 @pytest.fixture(autouse=True)
-def clear_cache():
+def clear_cache(monkeypatch):
     geocoding._lookup.cache_clear()
+    monkeypatch.setattr(geocoding, "_throttle", lambda: None)
 
 
 def patch_get(monkeypatch, response=None, exc=None):
@@ -94,3 +99,13 @@ def test_same_place_is_cached_ignoring_case_and_spacing(monkeypatch):
     geocoding.geocode("Houston,  TX")
     geocoding.geocode("houston, tx")
     assert len(calls) == 1
+
+    
+
+def test_throttle_spaces_out_real_lookups(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(geocoding.time, "monotonic", lambda: 100.0)
+    monkeypatch.setattr(geocoding.time, "sleep", lambda s: sleeps.append(s))
+    monkeypatch.setattr(geocoding, "_last_call", 99.5)
+    REAL_THROTTLE()
+    assert sleeps == [pytest.approx(0.5)]
