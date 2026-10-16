@@ -13,3 +13,8 @@ class GeocodingError(TripError):
 
 class RoutingError(TripError):
     """No usable route could be obtained, or the routing service failed."""
+
+    
+
+class WeatherError(TripError):
+    """Weather data could not be retrieved, or the response was not usable."""
