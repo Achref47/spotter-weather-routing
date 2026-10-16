@@ -1,13 +1,16 @@
-"""Orchestrate one trip analysis: geocode, route, checkpoints, weather, risk, ranking."""
+"""Orchestrate one trip analysis: geocode, route, checkpoints, weather, risk, ranking, heatmap."""
 from datetime import datetime, timedelta, timezone
 
 from trips.domain.checkpoints import METERS_PER_MILE, generate_checkpoints
+from trips.domain.heatmap import HEATMAP_HOURS, build_heatmap, sample_corridor
 from trips.domain.risk import assess
 from trips.domain.route_stats import compute_stats, recommend
 from trips.domain.weather_match import weather_at
 from trips.services.geocoding import geocode
 from trips.services.routing import get_route_options
 from trips.services.weather import forecast_days_for, series_for_points
+
+MAX_HEATMAP_POINTS = 80  # keeps weather lookups (and the response size) bounded
 
 
 def _round(value, digits):
@@ -43,18 +46,23 @@ def analyze_trip(data: dict) -> dict:
         cps = generate_checkpoints(cand.coords, cand.distance_m, cand.duration_s, departure, interval)
         planned.append((cand, cps))
 
-    # One batched weather lookup for every checkpoint on every route.
-    points = [(c.lat, c.lon) for _, cps in planned for c in cps]
+    corridor = sample_corridor([cand.coords for cand, _ in planned], max_points=MAX_HEATMAP_POINTS)
+
+    # One batched weather lookup covers every checkpoint and every heatmap point.
+    checkpoint_points = [(c.lat, c.lon) for _, cps in planned for c in cps]
     last_eta = max(c.eta for _, cps in planned for c in cps)
-    days = forecast_days_for(last_eta + timedelta(hours=1), datetime.now(timezone.utc))
-    series_iter = iter(series_for_points(points, days))
+    last_needed = max(last_eta + timedelta(hours=1), departure + timedelta(hours=HEATMAP_HOURS + 1))
+    days = forecast_days_for(last_needed, datetime.now(timezone.utc))
+    all_series = series_for_points(checkpoint_points + corridor, days)
+    checkpoint_series = iter(all_series[: len(checkpoint_points)])
+    heatmap_series = all_series[len(checkpoint_points):]
 
     routes, entries = [], []
     for i, (cand, cps) in enumerate(planned, start=1):
         route_id = f"route-{i}"
         assessments, checkpoint_payloads = [], []
         for c in cps:
-            wx = weather_at(next(series_iter), c.eta)
+            wx = weather_at(next(checkpoint_series), c.eta)
             a = assess(wx["wind_mph"], wx["rain_in_hr"], wx["snow_in_hr"], load_lb)
             assessments.append(a)
             checkpoint_payloads.append(
@@ -128,5 +136,6 @@ def analyze_trip(data: dict) -> dict:
             "status": rec["status"],
             "explanation": rec["explanation"],
         },
+        "heatmap": build_heatmap(corridor, heatmap_series, departure, load_lb),
         "warnings": warnings,
     }

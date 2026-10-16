@@ -132,3 +132,25 @@ def test_summary_miles_add_up_to_the_route_length(monkeypatch):
         total = sum(s[k] for k in ("low_mi", "moderate_mi", "high_mi", "severe_mi",
                                    "no_travel_mi", "unknown_mi"))
         assert total == pytest.approx(route["distance_mi"], abs=0.3)
+
+
+    
+
+def test_heatmap_shape(monkeypatch):
+    body = run(monkeypatch, fake_weather()).json()
+    hm = body["heatmap"]
+    assert hm["hours"] == 48
+    assert hm["start_time"] == body["departure_time"]
+    assert 2 <= len(hm["points"]) <= 80
+    assert all(len(p["levels"]) == 49 for p in hm["points"])
+    assert all(set(p["levels"]) == {0} for p in hm["points"])
+
+
+def test_heatmap_marks_strong_wind_as_no_travel_where_it_blows(monkeypatch):
+    body = run(monkeypatch, fake_weather(route2_wind=50.0), load=42000).json()
+    points = body["heatmap"]["points"]
+    second = [p for p in points if p["lat"] > 0.5]
+    first = [p for p in points if p["lat"] <= 0.5]
+    assert second and first
+    assert all(set(p["levels"]) == {4} for p in second)
+    assert all(set(p["levels"]) == {0} for p in first)
