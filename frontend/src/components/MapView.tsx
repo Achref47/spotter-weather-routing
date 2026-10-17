@@ -169,7 +169,10 @@ export default function MapView({ result, selectedId, onSelect }: Props) {
       const route = map.queryRenderedFeatures(hitBox(e.point, 8), { layers: ['routes-other'] })[0]
       if (route) onSelectRef.current(String(route.properties?.id))
     })
-
+    map.on('error', (e) => {
+      console.error('MapLibre error:', e.error?.message ?? e)
+    })
+    
     map.on('mousemove', (e) => {
       if (!map.getLayer('checkpoints')) return
       const hit = map.queryRenderedFeatures(hitBox(e.point, 6), {
