@@ -12,6 +12,8 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import type { Point } from 'geojson'
 import { useEffect, useRef, useState } from 'react'
 import { riskColor } from '../lib/format'
+import { heatmapCollection } from '../lib/heatmap'
+import { addHeatmapLayer, applyHeatmapHour, HEATMAP_SOURCE } from '../lib/heatmapStyle'
 import {
   checkpointsCollection,
   emptyCollection,
@@ -20,6 +22,7 @@ import {
 } from '../lib/mapData'
 import { checkpointPopup } from '../lib/popup'
 import type { AnalyzeResponse, Place } from '../types'
+import HeatmapControl from './HeatmapControl'
 
 setWorkerUrl(workerUrl)
 const STYLE_URL: string =
@@ -111,6 +114,7 @@ function addLayers(map: MapLibreMap) {
       'circle-stroke-width': 1.5,
     },
   })
+  addHeatmapLayer(map, 'routes-other')
 }
 
 function applySelection(map: MapLibreMap, selectedId: string | null) {
@@ -145,6 +149,13 @@ export default function MapView({ result, selectedId, onSelect, loading, failed 
   const onSelectRef = useRef(onSelect)
   const selectedRef = useRef(selectedId)
   const [ready, setReady] = useState(false)
+  const [heatVisible, setHeatVisible] = useState(true)
+  // The slider hour belongs to one result; a new result starts again at hour 0.
+  const [heatHour, setHeatHour] = useState<{ forResult: AnalyzeResponse | null; hour: number }>({
+    forResult: null,
+    hour: 0,
+  })
+  const hour = heatHour.forResult === result ? heatHour.hour : 0
 
   useEffect(() => {
     onSelectRef.current = onSelect
@@ -231,6 +242,8 @@ export default function MapView({ result, selectedId, onSelect, loading, failed 
     const checkpointSource = map.getSource('checkpoints') as GeoJSONSource | undefined
     routeSource?.setData(routesCollection(routes))
     checkpointSource?.setData(checkpointsCollection(routes))
+    const heatSource = map.getSource(HEATMAP_SOURCE) as GeoJSONSource | undefined
+    heatSource?.setData(result ? heatmapCollection(result.heatmap) : emptyCollection())
 
     markers.current.forEach((m) => m.remove())
     markers.current = []
@@ -255,6 +268,13 @@ export default function MapView({ result, selectedId, onSelect, loading, failed 
     applySelection(map, selectedId)
   }, [ready, selectedId])
 
+  // Moving the slider only changes two paint properties on the map. No data, no network.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!ready || !map) return
+    applyHeatmapHour(map, hour, heatVisible)
+  }, [ready, hour, heatVisible])
+
   const message = mapMessage(result, failed)
 
   return (
@@ -268,6 +288,15 @@ export default function MapView({ result, selectedId, onSelect, loading, failed 
           </div>
         ))}
       </div>
+      {result && result.heatmap.points.length > 0 && !loading && (
+        <HeatmapControl
+          heatmap={result.heatmap}
+          hour={hour}
+          onHour={(h) => setHeatHour({ forResult: result, hour: h })}
+          visible={heatVisible}
+          onVisible={setHeatVisible}
+        />
+      )}
       {message && !loading && <div className="map-hint">{message}</div>}
       {loading && (
         <div className="map-loading" aria-hidden="true">

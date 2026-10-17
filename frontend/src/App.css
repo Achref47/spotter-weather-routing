@@ -333,3 +333,95 @@
     animation-duration: 3s;
   }
 }
+
+.heat-control {
+  position: absolute;
+  right: 12px;
+  bottom: 40px;
+  left: 132px;
+  z-index: 1;
+  max-width: 560px;
+  padding: 8px 12px 10px;
+  margin-inline: auto;
+  font-size: 0.8rem;
+  background: rgba(13, 17, 23, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.heat-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.heat-toggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.heat-time {
+  text-align: right;
+}
+
+.heat-slider {
+  width: 100%;
+  margin: 8px 0 2px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.heat-slider:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.heat-slider:focus-visible,
+.heat-toggle input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.heat-scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.heat-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 800px) {
+  .map-area {
+    min-height: 460px;
+  }
+
+  /* Legend top-left, slider panel along the bottom: they no longer fight for the same corner. */
+  .legend {
+    top: 8px;
+    bottom: auto;
+    left: 8px;
+  }
+
+  .heat-control {
+    right: 8px;
+    bottom: 48px;
+    left: 8px;
+  }
+
+  .map-hint {
+    top: auto;
+    bottom: 52px;
+    width: max-content;
+    max-width: calc(100% - 24px);
+    text-align: center;
+  }
+}
