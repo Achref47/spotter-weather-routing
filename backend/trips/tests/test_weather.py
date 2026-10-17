@@ -207,3 +207,23 @@ def test_cache_refetches_only_when_more_days_are_needed(monkeypatch):
 def test_forecast_days_for(last, expected):
     now = datetime(2026, 10, 16, 23, 0, tzinfo=timezone.utc)
     assert weather.forecast_days_for(last, now) == expected
+
+def test_ecmwf_is_the_default_model(monkeypatch):
+    monkeypatch.delenv("OPEN_METEO_MODEL", raising=False)
+    urls = patch_get(monkeypatch, default_payload)
+    weather.series_for_points([(29.76, -95.37)], 1)
+    assert "&models=ecmwf_ifs025" in urls[0]
+
+
+def test_model_can_be_overridden_by_environment(monkeypatch):
+    monkeypatch.setenv("OPEN_METEO_MODEL", "gfs_global")
+    urls = patch_get(monkeypatch, default_payload)
+    weather.series_for_points([(29.76, -95.37)], 1)
+    assert "&models=gfs_global" in urls[0]
+
+
+def test_empty_model_uses_the_open_meteo_default_blend(monkeypatch):
+    monkeypatch.setenv("OPEN_METEO_MODEL", "")
+    urls = patch_get(monkeypatch, default_payload)
+    weather.series_for_points([(29.76, -95.37)], 1)
+    assert "models=" not in urls[0]
