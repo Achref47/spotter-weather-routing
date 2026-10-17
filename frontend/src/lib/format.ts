@@ -11,9 +11,15 @@ export function riskColor(level: number | null | undefined): string {
   return RISK_COLORS[level ?? -1] ?? RISK_COLORS[-1]
 }
 
-/** Text colour that stays readable on a risk pill: dark on the light yellow and orange. */
-export function riskTextColor(level: number | null | undefined): string {
-  return level === 1 || level === 2 ? '#111111' : '#ffffff'
+/**
+ * Text colour for anything drawn on a risk colour. Dark text has at least 5.4:1 contrast on all
+ * six fills, while white only reaches 1.8 to 3.5:1; format.test.ts checks this.
+ */
+export const RISK_TEXT_COLOR = '#111111'
+
+/** Miles with one decimal everywhere, so 0.4 Severe miles never shows as "0". */
+export function formatMiles(miles: number): string {
+  return miles.toFixed(1)
 }
 
 export function formatDuration(seconds: number): string {

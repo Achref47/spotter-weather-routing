@@ -6,6 +6,7 @@ import MapView from './components/MapView'
 import RouteList from './components/RouteList'
 import TripForm from './components/TripForm'
 import { checkpointKey } from './lib/checkpoints'
+import { LOADING_TEXT } from './lib/messages'
 import type { AnalyzeRequest, AnalyzeResponse, Checkpoint, FocusRequest, Route } from './types'
 
 const BANNER_CLASS: Record<string, string> = {
@@ -62,7 +63,7 @@ export default function App() {
         )}
         {loading && (
           <p className="banner info" role="status">
-            Analyzing routes and weather… this can take up to 10 seconds.
+            {LOADING_TEXT}
           </p>
         )}
 

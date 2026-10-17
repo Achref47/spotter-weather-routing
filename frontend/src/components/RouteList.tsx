@@ -1,4 +1,4 @@
-import { avgRiskLabel, formatDateTime, formatDuration, routeColor } from '../lib/format'
+import { avgRiskLabel, formatDateTime, formatDuration, formatMiles, routeColor } from '../lib/format'
 import type { Recommendation, Route } from '../types'
 
 interface Props {
@@ -32,21 +32,21 @@ export default function RouteList({ routes, recommendation, selectedId, onSelect
                 {s.no_travel_mi > 0 && <span className="badge danger">No Travel</span>}
               </div>
               <div className="route-meta">
-                {route.distance_mi.toFixed(0)} mi · {formatDuration(route.duration_s)} · arrives{' '}
+                {formatMiles(route.distance_mi)} mi · {formatDuration(route.duration_s)} · arrives{' '}
                 {formatDateTime(route.arrival_time)}
               </div>
               <dl className="stats">
                 <div>
                   <dt>Severe</dt>
-                  <dd>{s.severe_mi.toFixed(0)} mi</dd>
+                  <dd>{formatMiles(s.severe_mi)} mi</dd>
                 </div>
                 <div>
                   <dt>High</dt>
-                  <dd>{s.high_mi.toFixed(0)} mi</dd>
+                  <dd>{formatMiles(s.high_mi)} mi</dd>
                 </div>
                 <div>
                   <dt>No Travel</dt>
-                  <dd>{s.no_travel_mi.toFixed(0)} mi</dd>
+                  <dd>{formatMiles(s.no_travel_mi)} mi</dd>
                 </div>
                 <div>
                   <dt>Avg risk</dt>
@@ -54,7 +54,7 @@ export default function RouteList({ routes, recommendation, selectedId, onSelect
                 </div>
               </dl>
               {s.unknown_mi > 0 && (
-                <p className="note">{s.unknown_mi.toFixed(0)} mi without forecast data</p>
+                <p className="note">{formatMiles(s.unknown_mi)} mi without forecast data</p>
               )}
             </button>
           </li>

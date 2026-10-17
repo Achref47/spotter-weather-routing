@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react'
 import { riskColor } from '../lib/format'
 import { heatmapCollection } from '../lib/heatmap'
 import { addHeatmapLayer, applyHeatmapHour, HEATMAP_SOURCE } from '../lib/heatmapStyle'
+import { LOADING_TEXT, mapMessage } from '../lib/messages'
 import {
   checkpointProperties,
   checkpointsCollection,
@@ -45,16 +46,6 @@ interface Props {
   loading: boolean
   failed: boolean
   focus: FocusRequest | null
-}
-
-/** The message shown over the map when there is nothing to draw, or something to flag. */
-function mapMessage(result: AnalyzeResponse | null, failed: boolean): string | null {
-  if (failed) return 'The trip could not be analyzed. Fix the problem on the left and try again.'
-  if (!result) return 'Enter a trip and click “Compare routes”.'
-  if (result.recommendation.status === 'no_safe_route') {
-    return 'No safe route: every route has No Travel conditions at this departure time.'
-  }
-  return null
 }
 
 function openPopup(map: MapLibreMap, properties: Record<string, unknown>, lngLat: [number, number]): Popup {
@@ -333,7 +324,7 @@ export default function MapView({ result, selectedId, onSelect, loading, failed,
       {loading && (
         <div className="map-loading" aria-hidden="true">
           <span className="spinner" />
-          Analyzing routes and weather…
+          {LOADING_TEXT}
         </div>
       )}
     </>

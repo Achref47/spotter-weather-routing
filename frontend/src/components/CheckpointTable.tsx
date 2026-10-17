@@ -1,5 +1,5 @@
 import { checkpointKey, etaShort, formatMile, formatReading } from '../lib/checkpoints'
-import { riskColor, riskTextColor } from '../lib/format'
+import { RISK_TEXT_COLOR, riskColor } from '../lib/format'
 import type { Checkpoint, Route } from '../types'
 
 interface Props {
@@ -59,7 +59,7 @@ export default function CheckpointTable({ route, focusedKey, onFocus }: Props) {
                     <span
                       className="risk-pill"
                       title={c.risk.reasons.join('\n')}
-                      style={{ background: riskColor(level), color: riskTextColor(level) }}
+                      style={{ background: riskColor(level), color: RISK_TEXT_COLOR }}
                     >
                       {c.risk.overall ?? 'Unknown'}
                     </span>

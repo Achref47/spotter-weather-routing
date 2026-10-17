@@ -1,6 +1,6 @@
 import type { Feature, FeatureCollection, LineString, Point } from 'geojson'
 import type { Checkpoint, Route } from '../types'
-import { formatDateTime, riskColor, riskTextColor, routeColor } from './format'
+import { formatDateTime, RISK_TEXT_COLOR, riskColor, routeColor } from './format'
 
 export type Bounds = [[number, number], [number, number]]
 
@@ -35,7 +35,7 @@ export function checkpointProperties(route: Route, c: Checkpoint): Record<string
     snow: describe(c.weather.snow_in_hr, 'in/hr', 2),
     risk: c.risk.overall ?? 'Unknown',
     color: riskColor(c.risk.overall_level),
-    textColor: riskTextColor(c.risk.overall_level),
+    textColor: RISK_TEXT_COLOR,
     reasons: c.risk.reasons.join('|'),
   }
 }
