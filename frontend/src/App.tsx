@@ -1,10 +1,13 @@
 import { useRef, useState } from 'react'
 import './App.css'
 import { analyzeTrip } from './api'
+import CheckpointTable from './components/CheckpointTable'
+import MapView from './components/MapView'
 import RouteList from './components/RouteList'
 import TripForm from './components/TripForm'
-import type { AnalyzeRequest, AnalyzeResponse } from './types'
-import MapView from './components/MapView'
+import { checkpointKey } from './lib/checkpoints'
+import type { AnalyzeRequest, AnalyzeResponse, Checkpoint, FocusRequest, Route } from './types'
+
 const BANNER_CLASS: Record<string, string> = {
   recommended: 'good',
   incomplete_data: 'warn',
@@ -17,6 +20,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [focus, setFocus] = useState<FocusRequest | null>(null)
   const controller = useRef<AbortController | null>(null)
 
   async function handleSubmit(request: AnalyzeRequest) {
@@ -28,6 +32,7 @@ export default function App() {
     try {
       const data = await analyzeTrip(request, current.signal)
       setResult(data)
+      setFocus(null)
       setSelectedId(data.recommendation.route_id ?? data.routes[0]?.id ?? null)
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return
@@ -37,6 +42,12 @@ export default function App() {
       if (controller.current === current) setLoading(false)
     }
   }
+
+  function focusCheckpoint(route: Route, checkpoint: Checkpoint) {
+    setFocus({ routeId: route.id, mile: checkpoint.mile })
+  }
+
+  const selectedRoute = result?.routes.find((r) => r.id === selectedId) ?? null
 
   return (
     <div className="app">
@@ -74,6 +85,13 @@ export default function App() {
               selectedId={selectedId}
               onSelect={setSelectedId}
             />
+            {selectedRoute && (
+              <CheckpointTable
+                route={selectedRoute}
+                focusedKey={focus ? checkpointKey(focus.routeId, focus.mile) : null}
+                onFocus={focusCheckpoint}
+              />
+            )}
           </>
         )}
 
@@ -96,6 +114,7 @@ export default function App() {
           onSelect={setSelectedId}
           loading={loading}
           failed={error !== null}
+          focus={focus}
         />
       </main>
     </div>

@@ -11,6 +11,11 @@ export function riskColor(level: number | null | undefined): string {
   return RISK_COLORS[level ?? -1] ?? RISK_COLORS[-1]
 }
 
+/** Text colour that stays readable on a risk pill: dark on the light yellow and orange. */
+export function riskTextColor(level: number | null | undefined): string {
+  return level === 1 || level === 2 ? '#111111' : '#ffffff'
+}
+
 export function formatDuration(seconds: number): string {
   const totalMinutes = Math.round(seconds / 60)
   const hours = Math.floor(totalMinutes / 60)

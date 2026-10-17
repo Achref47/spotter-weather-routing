@@ -1,6 +1,6 @@
 import type { Feature, FeatureCollection, LineString, Point } from 'geojson'
-import type { Route } from '../types'
-import { formatDateTime, riskColor, routeColor } from './format'
+import type { Checkpoint, Route } from '../types'
+import { formatDateTime, riskColor, riskTextColor, routeColor } from './format'
 
 export type Bounds = [[number, number], [number, number]]
 
@@ -23,24 +23,30 @@ function describe(value: number | null, unit: string, digits: number): string {
   return value === null ? 'unavailable' : `${value.toFixed(digits)} ${unit}`
 }
 
+/** What the checkpoint popup shows. Used for map features and for the table's "focus" action. */
+export function checkpointProperties(route: Route, c: Checkpoint): Record<string, string | number> {
+  return {
+    routeId: route.id,
+    routeLabel: route.label,
+    mile: c.mile,
+    eta: formatDateTime(c.eta),
+    wind: describe(c.weather.wind_mph, 'mph', 1),
+    rain: describe(c.weather.rain_in_hr, 'in/hr', 2),
+    snow: describe(c.weather.snow_in_hr, 'in/hr', 2),
+    risk: c.risk.overall ?? 'Unknown',
+    color: riskColor(c.risk.overall_level),
+    textColor: riskTextColor(c.risk.overall_level),
+    reasons: c.risk.reasons.join('|'),
+  }
+}
+
 export function checkpointsCollection(routes: Route[]): FeatureCollection<Point> {
   const features: Feature<Point>[] = []
   for (const r of routes) {
     for (const c of r.checkpoints) {
       features.push({
         type: 'Feature',
-        properties: {
-          routeId: r.id,
-          routeLabel: r.label,
-          mile: c.mile,
-          eta: formatDateTime(c.eta),
-          wind: describe(c.weather.wind_mph, 'mph', 1),
-          rain: describe(c.weather.rain_in_hr, 'in/hr', 2),
-          snow: describe(c.weather.snow_in_hr, 'in/hr', 2),
-          risk: c.risk.overall ?? 'Unknown',
-          color: riskColor(c.risk.overall_level),
-          reasons: c.risk.reasons.join('|'),
-        },
+        properties: checkpointProperties(r, c),
         geometry: { type: 'Point', coordinates: [c.lon, c.lat] },
       })
     }

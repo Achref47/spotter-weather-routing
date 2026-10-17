@@ -15,13 +15,14 @@ import { riskColor } from '../lib/format'
 import { heatmapCollection } from '../lib/heatmap'
 import { addHeatmapLayer, applyHeatmapHour, HEATMAP_SOURCE } from '../lib/heatmapStyle'
 import {
+  checkpointProperties,
   checkpointsCollection,
   emptyCollection,
   routeBounds,
   routesCollection,
 } from '../lib/mapData'
 import { checkpointPopup } from '../lib/popup'
-import type { AnalyzeResponse, Place } from '../types'
+import type { AnalyzeResponse, FocusRequest, Place } from '../types'
 import HeatmapControl from './HeatmapControl'
 
 setWorkerUrl(workerUrl)
@@ -43,6 +44,7 @@ interface Props {
   onSelect: (id: string) => void
   loading: boolean
   failed: boolean
+  focus: FocusRequest | null
 }
 
 /** The message shown over the map when there is nothing to draw, or something to flag. */
@@ -53,6 +55,13 @@ function mapMessage(result: AnalyzeResponse | null, failed: boolean): string | n
     return 'No safe route: every route has No Travel conditions at this departure time.'
   }
   return null
+}
+
+function openPopup(map: MapLibreMap, properties: Record<string, unknown>, lngLat: [number, number]): Popup {
+  return new Popup({ maxWidth: '280px' })
+    .setLngLat(lngLat)
+    .setDOMContent(checkpointPopup(properties))
+    .addTo(map)
 }
 
 function pin(label: 'A' | 'B', place: Place): HTMLElement {
@@ -142,12 +151,14 @@ function applySelection(map: MapLibreMap, selectedId: string | null) {
   ])
 }
 
-export default function MapView({ result, selectedId, onSelect, loading, failed }: Props) {
+export default function MapView({ result, selectedId, onSelect, loading, failed, focus }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const markers = useRef<Marker[]>([])
   const onSelectRef = useRef(onSelect)
   const selectedRef = useRef(selectedId)
+  const popupRef = useRef<Popup | null>(null)
+  const handledFocus = useRef<FocusRequest | null>(null)
   const [ready, setReady] = useState(false)
   const [heatVisible, setHeatVisible] = useState(true)
   // The slider hour belongs to one result; a new result starts again at hour 0.
@@ -198,10 +209,8 @@ export default function MapView({ result, selectedId, onSelect, loading, failed 
           return
         }
         const [lon, lat] = (checkpoint.geometry as Point).coordinates
-        new Popup({ maxWidth: '280px' })
-          .setLngLat([lon, lat])
-          .setDOMContent(checkpointPopup(checkpoint.properties ?? {}))
-          .addTo(map)
+        popupRef.current?.remove()
+        popupRef.current = openPopup(map, checkpoint.properties ?? {}, [lon, lat])
         return
       }
       const route = map.queryRenderedFeatures(hitBox(e.point, ROUTE_HIT_PAD), {
@@ -245,6 +254,7 @@ export default function MapView({ result, selectedId, onSelect, loading, failed 
     const heatSource = map.getSource(HEATMAP_SOURCE) as GeoJSONSource | undefined
     heatSource?.setData(result ? heatmapCollection(result.heatmap) : emptyCollection())
 
+    popupRef.current?.remove()
     markers.current.forEach((m) => m.remove())
     markers.current = []
     if (result) {
@@ -261,11 +271,33 @@ export default function MapView({ result, selectedId, onSelect, loading, failed 
     }
   }, [ready, result])
 
+  // A checkpoint chosen in the table: zoom to it and show the same popup a dot click shows.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!ready || !map || !result || !focus || focus === handledFocus.current) return
+    handledFocus.current = focus
+    const route = result.routes.find((r) => r.id === focus.routeId)
+    const checkpoint = route?.checkpoints.find((c) => c.mile === focus.mile)
+    if (!route || !checkpoint) return
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    map.flyTo({
+      center: [checkpoint.lon, checkpoint.lat],
+      zoom: Math.max(map.getZoom(), 8),
+      duration: reduceMotion ? 0 : 700,
+    })
+    popupRef.current?.remove()
+    popupRef.current = openPopup(map, checkpointProperties(route, checkpoint), [
+      checkpoint.lon,
+      checkpoint.lat,
+    ])
+  }, [ready, result, focus])
+
   // Selection changes only touch filters and styles, so they are instant.
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map) return
     applySelection(map, selectedId)
+    popupRef.current?.remove() // a popup belongs to the route that was selected when it opened
   }, [ready, selectedId])
 
   // Moving the slider only changes two paint properties on the map. No data, no network.

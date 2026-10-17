@@ -18,6 +18,7 @@ export function checkpointPopup(p: Record<string, unknown>): HTMLElement {
   const badge = document.createElement('span')
   badge.className = 'cp-badge'
   badge.style.background = String(p.color)
+  badge.style.color = String(p.textColor ?? '#ffffff')
   badge.textContent = String(p.risk)
   const risk = document.createElement('div')
   risk.append(badge)

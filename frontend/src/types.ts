@@ -88,6 +88,12 @@ export interface AnalyzeResponse {
   warnings: string[]
 }
 
+/** Asks the map to zoom to one checkpoint. A new object each time, so repeat clicks still fire. */
+export interface FocusRequest {
+  routeId: string
+  mile: number
+}
+
 export interface AnalyzeRequest {
   origin: string
   destination: string
