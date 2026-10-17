@@ -3,13 +3,14 @@ import math
 import threading
 import time
 from datetime import timezone
-
+import logging
 import requests
 
 from trips.domain.weather_match import HourlySeries
 from trips.errors import WeatherError
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+logger = logging.getLogger(__name__)
 HOURLY_VARS = "wind_speed_10m,rain,showers,snowfall"
 BATCH_SIZE = 50
 TIMEOUT_S = 20
@@ -97,6 +98,8 @@ def _fetch_batch(keys, days: int):
         resp.raise_for_status()
         data = resp.json()
     except (requests.RequestException, ValueError) as exc:
+        detail = getattr(getattr(exc, "response", None), "text", "") or ""
+        logger.warning("Open-Meteo request failed: %r %s", exc, detail[:200])
         raise WeatherError("The weather service is unavailable.") from exc
     # One location returns an object; several return a list.
     locations = data if isinstance(data, list) else [data]
