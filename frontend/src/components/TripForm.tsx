@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { defaultDeparture } from '../lib/format'
+import { buildRequest } from '../lib/tripRequest'
 import type { AnalyzeRequest, Interval } from '../types'
 
 interface Props {
@@ -22,31 +23,13 @@ export default function TripForm({ onSubmit, loading }: Props) {
   }
 
   function submit(demo: 'storm' | undefined) {
-    const when = new Date(departure)
-    const load = Number(loadLb)
-
-    if (origin.trim().length < 2 || destination.trim().length < 2) {
-      setFormError('Enter an origin and a destination.')
+    const built = buildRequest({ origin, destination, departure, loadLb, interval }, demo)
+    if (!built.ok) {
+      setFormError(built.error)
       return
     }
-    if (Number.isNaN(when.getTime())) {
-      setFormError('Choose a departure date and time.')
-      return
-    }
-    if (!Number.isFinite(load) || load < 0 || load > 80000) {
-      setFormError('Load weight must be between 0 and 80,000 lb.')
-      return
-    }
-
     setFormError(null)
-    onSubmit({
-      origin: origin.trim(),
-      destination: destination.trim(),
-      departure_time: when.toISOString().replace(/\.\d{3}Z$/, 'Z'),
-      load_weight_lb: load,
-      checkpoint_interval_mi: interval,
-      demo_scenario: demo,
-    })
+    onSubmit(built.request)
   }
 
   return (
