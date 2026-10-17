@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 HOURLY_VARS = "wind_speed_10m,rain,showers,snowfall"
 BATCH_SIZE = 25
 MAX_WORKERS = 4
-TIMEOUT_S = (5, 60)  # connect, read (seconds)RETRY_DELAY_S = 1.5
+TIMEOUT_S = (5, 60)  # connect, read (seconds)
+RETRY_DELAY_S = 1.5
 RETRY_STATUSES = {429, 500, 502, 503, 504}
 CACHE_TTL_S = 1800
 CACHE_MAX_ENTRIES = 5000

@@ -211,7 +211,8 @@
 }
 
 
-.map-canvas {
+/* Two classes, so this beats maplibre-gl.css (.maplibregl-map { position: relative }). */
+.map-area .map-canvas {
   position: absolute;
   inset: 0;
 }
