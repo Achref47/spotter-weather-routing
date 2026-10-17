@@ -687,3 +687,24 @@
   margin: 0 2px;
   font-size: 0.7rem;
 }
+
+/* Secondary action under the recommendation; the route cards below stay the main focus. */
+.report-button {
+  align-self: flex-start;
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid #8b949e;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.report-button:hover {
+  background: rgba(139, 148, 158, 0.15);
+}
+.report-button:focus-visible {
+  outline: 2px solid #1f6feb;
+  outline-offset: 2px;
+}

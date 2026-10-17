@@ -4,6 +4,7 @@ import { analyzeTrip } from './api'
 import CheckpointTable from './components/CheckpointTable'
 import MapView from './components/MapView'
 import RecommendationWhy from './components/RecommendationWhy'
+import ReportButton from './components/ReportButton'
 import RouteList from './components/RouteList'
 import TripForm from './components/TripForm'
 import WeatherSourceBanner from './components/WeatherSourceBanner'
@@ -86,6 +87,7 @@ export default function App() {
                 {w}
               </p>
             ))}
+            <ReportButton result={result} simulated={simulated} />
             <RouteList
               routes={result.routes}
               recommendation={result.recommendation}
