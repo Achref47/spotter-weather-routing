@@ -1,9 +1,11 @@
-"""Fetch hourly forecasts from Open-Meteo: batched requests, cached results."""
+"""Fetch hourly forecasts from Open-Meteo: batched, parallel, retried once, cached."""
+import logging
 import math
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timezone
-import logging
+
 import requests
 
 from trips.domain.weather_match import HourlySeries
@@ -12,8 +14,10 @@ from trips.errors import WeatherError
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 logger = logging.getLogger(__name__)
 HOURLY_VARS = "wind_speed_10m,rain,showers,snowfall"
-BATCH_SIZE = 50
-TIMEOUT_S = 20
+BATCH_SIZE = 25
+MAX_WORKERS = 4
+TIMEOUT_S = (5, 60)  # connect, read (seconds)RETRY_DELAY_S = 1.5
+RETRY_STATUSES = {429, 500, 502, 503, 504}
 CACHE_TTL_S = 1800
 CACHE_MAX_ENTRIES = 5000
 MAX_FORECAST_DAYS = 16
@@ -92,15 +96,37 @@ def _parse_location(loc) -> HourlySeries:
     return HourlySeries(times=times, wind_mph=wind, liquid_in_hr=liquid, snow_in_hr=snow)
 
 
+def _http_status(exc):
+    return getattr(getattr(exc, "response", None), "status_code", None)
+
+
+def _get_json(url: str):
+    """GET a URL as JSON. Retries once after a timeout, a 429 or a 5xx; nothing else."""
+    for attempt in (1, 2):
+        try:
+            resp = requests.get(url, timeout=TIMEOUT_S)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException as exc:
+            status = _http_status(exc)
+            retryable = isinstance(exc, requests.Timeout) or status in RETRY_STATUSES
+            if attempt == 1 and retryable:
+                time.sleep(RETRY_DELAY_S)
+                continue
+            detail = getattr(getattr(exc, "response", None), "text", "") or ""
+            logger.warning("Open-Meteo request failed: %r %s", exc, detail[:200])
+            if status == 429:
+                raise WeatherError(
+                    "The weather service rate limit was reached. Try again in a minute."
+                ) from exc
+            raise WeatherError("The weather service is unavailable.") from exc
+        except ValueError as exc:  # the response body was not JSON
+            logger.warning("Open-Meteo returned invalid JSON: %r", exc)
+            raise WeatherError("The weather service is unavailable.") from exc
+
+
 def _fetch_batch(keys, days: int):
-    try:
-        resp = requests.get(_build_url(keys, days), timeout=TIMEOUT_S)
-        resp.raise_for_status()
-        data = resp.json()
-    except (requests.RequestException, ValueError) as exc:
-        detail = getattr(getattr(exc, "response", None), "text", "") or ""
-        logger.warning("Open-Meteo request failed: %r %s", exc, detail[:200])
-        raise WeatherError("The weather service is unavailable.") from exc
+    data = _get_json(_build_url(keys, days))
     # One location returns an object; several return a list.
     locations = data if isinstance(data, list) else [data]
     if len(locations) != len(keys):
@@ -112,7 +138,7 @@ def series_for_points(points, forecast_days: int):
     """Hourly forecast for each (lat, lon), in the same order as points.
 
     Nearby points share one request slot, results are cached for 30 minutes, and
-    uncached locations are fetched in batches of 50.
+    uncached locations are fetched in parallel batches of BATCH_SIZE.
     """
     keys = [grid_key(lat, lon) for lat, lon in points]
     result = {}
@@ -126,13 +152,16 @@ def series_for_points(points, forecast_days: int):
             else:
                 missing.append(key)
 
-    for i in range(0, len(missing), BATCH_SIZE):
-        batch = missing[i : i + BATCH_SIZE]
-        for key, series in zip(batch, _fetch_batch(batch, forecast_days)):
-            result[key] = series
-            with _lock:
-                if len(_cache) >= CACHE_MAX_ENTRIES:
-                    _cache.clear()
-                _cache[key] = (_now(), forecast_days, series)
+    batches = [missing[i : i + BATCH_SIZE] for i in range(0, len(missing), BATCH_SIZE)]
+    if batches:
+        with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(batches))) as pool:
+            fetched = list(pool.map(lambda b: _fetch_batch(b, forecast_days), batches))
+        for batch, series_list in zip(batches, fetched):
+            for key, series in zip(batch, series_list):
+                result[key] = series
+                with _lock:
+                    if len(_cache) >= CACHE_MAX_ENTRIES:
+                        _cache.clear()
+                    _cache[key] = (_now(), forecast_days, series)
 
     return [result[k] for k in keys]

@@ -153,12 +153,15 @@ def test_array_length_mismatch_raises(monkeypatch):
         weather.series_for_points([(29.76, -95.37)], 1)
 
 
-def test_requests_are_batched_in_fifties(monkeypatch):
+def test_requests_are_batched(monkeypatch):
     urls = patch_get(monkeypatch, default_payload)
-    points = [(20 + i * 0.1, -100.0) for i in range(120)]
+    n = weather.BATCH_SIZE * 2 + 7
+    points = [(20 + i * 0.1, -100.0) for i in range(n)]
     result = weather.series_for_points(points, 2)
-    assert len(result) == 120
-    assert [count_locations(u) for u in urls] == [50, 50, 20]
+    assert len(result) == n
+    assert sorted(count_locations(u) for u in urls) == sorted(
+        [weather.BATCH_SIZE, weather.BATCH_SIZE, 7]
+    )
 
 
 def test_nearby_points_share_one_location(monkeypatch):

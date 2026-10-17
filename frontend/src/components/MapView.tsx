@@ -7,7 +7,7 @@ import {
     setWorkerUrl,
     type GeoJSONSource,
 } from 'maplibre-gl'
-import workerUrl from 'maplibre-gl/dist/maplibre-gl-csp-worker.js?url'
+   import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { Point } from 'geojson'
 import { useEffect, useRef, useState } from 'react'
