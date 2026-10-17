@@ -57,10 +57,34 @@ export interface Route {
   rank: number
 }
 
+/** One ranking criterion, compared between the recommended route and the runner-up. */
+export interface CriterionStep {
+  key: 'severe_miles' | 'high_miles' | 'average_risk' | 'travel_time'
+  label: string
+  best: string
+  runner_up: string
+  outcome: 'tied' | 'decisive' | 'not_needed'
+}
+
+/** A route removed by the No Travel safety gate. */
+export interface ExcludedRoute {
+  id: string
+  label: string
+  no_travel_mi: number
+}
+
+export interface RecommendationComparison {
+  runner_up_id: string | null
+  runner_up_label: string | null
+  trail: CriterionStep[]
+  excluded: ExcludedRoute[]
+}
+
 export interface Recommendation {
   route_id: string | null
   status: 'recommended' | 'incomplete_data' | 'no_safe_route' | 'no_routes'
   explanation: string
+  comparison: RecommendationComparison | null
 }
 
 export interface HeatmapPoint {

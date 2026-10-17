@@ -147,3 +147,121 @@ def test_single_route_explanation():
 def test_explanation_names_the_deciding_criterion():
     result = recommend([entry("A", sev=0), entry("B", sev=12.5)])
     assert "Severe miles" in result["explanation"] and "12.5" in result["explanation"]
+
+# --- structured comparison (the "why this route" trail) ------------------------------------------
+
+import itertools  # noqa: E402
+
+KEYS = ["severe_miles", "high_miles", "average_risk", "travel_time"]
+
+
+def outcomes(result):
+    return [step["outcome"] for step in result["comparison"]["trail"]]
+
+
+def test_trail_lists_the_four_criteria_in_the_required_order():
+    trail = recommend([entry("A"), entry("B")])["comparison"]["trail"]
+    assert [step["key"] for step in trail] == KEYS
+    assert [step["label"] for step in trail] == [
+        "Fewest Severe miles", "Fewest High miles", "Lowest average risk", "Shortest travel time",
+    ]
+
+
+@pytest.mark.parametrize(
+    "a, b, expected",
+    [
+        (dict(sev=0), dict(sev=5), ["decisive", "not_needed", "not_needed", "not_needed"]),
+        (dict(high=5), dict(high=10), ["tied", "decisive", "not_needed", "not_needed"]),
+        (dict(avg=0.5), dict(avg=1.0), ["tied", "tied", "decisive", "not_needed"]),
+        (dict(duration=3000), dict(duration=4000), ["tied", "tied", "tied", "decisive"]),
+        ({}, {}, ["tied", "tied", "tied", "tied"]),
+    ],
+)
+def test_trail_marks_each_step_tied_decisive_or_not_needed(a, b, expected):
+    assert outcomes(recommend([entry("A", **a), entry("B", **b)])) == expected
+
+
+def test_trail_values_are_best_first_then_runner_up():
+    result = recommend([entry("A", sev=12.5), entry("B", sev=0)])
+    step = result["comparison"]["trail"][0]
+    assert result["route_id"] == "B" and result["comparison"]["runner_up_id"] == "A"
+    assert (step["best"], step["runner_up"]) == ("0.0 mi", "12.5 mi")
+
+
+def test_a_decisive_step_never_reads_as_identical_values():
+    result = recommend([entry("A", sev=5.01), entry("B", sev=5.0)])
+    step = result["comparison"]["trail"][0]
+    assert (step["best"], step["runner_up"]) == ("5.00 mi", "5.01 mi")
+    assert "5.00 mi vs 5.01 mi" in result["explanation"]
+
+
+def test_a_decisive_time_step_adds_precision_until_the_values_differ():
+    result = recommend([entry("A", duration=3610), entry("B", duration=3600)])
+    step = result["comparison"]["trail"][3]
+    assert (step["best"], step["runner_up"]) == ("1 h 00 min 00 s", "1 h 00 min 10 s")
+    wide = recommend([entry("A", duration=43_200), entry("B", duration=42_600)])["comparison"]["trail"][3]
+    assert (wide["best"], wide["runner_up"]) == ("11.8 h", "12.0 h")
+
+
+def test_unknown_average_risk_is_shown_as_n_a():
+    result = recommend([entry("A", avg=None), entry("B", avg=3.0)])
+    step = result["comparison"]["trail"][2]
+    assert (step["best"], step["runner_up"]) == ("3.00", "n/a")
+
+
+def test_trail_agrees_with_an_independent_ranking_for_every_combination():
+    """Oracle: plain tuple comparison of (severe, high, average, time). The backend winner and
+    its decisive criterion must match for all 256 pairs of routes."""
+    values = list(itertools.product((0, 5), (0, 5), (0.5, 1.0), (3000, 4000)))
+    for (sa, ha, ra, ta), (sb, hb, rb, tb) in itertools.product(values, values):
+        a = entry("A", sev=sa, high=ha, avg=ra, duration=ta)
+        b = entry("B", sev=sb, high=hb, avg=rb, duration=tb)
+        result = recommend([a, b])
+        left, right = (sa, ha, ra, ta), (sb, hb, rb, tb)
+        expected_best = "A" if left <= right else "B"  # a full tie keeps the first listed route
+        assert result["route_id"] == expected_best, (left, right)
+        first_difference = next((i for i in range(4) if left[i] != right[i]), None)
+        marks = outcomes(result)
+        if first_difference is None:
+            assert marks == ["tied"] * 4
+        else:
+            assert marks.index("decisive") == first_difference, (left, right)
+            assert marks[:first_difference] == ["tied"] * first_difference
+            assert set(marks[first_difference + 1:]) <= {"not_needed"}
+            label_word = {"severe_miles": "Severe miles", "high_miles": "High miles",
+                          "average_risk": "average risk", "travel_time": "travel time"}[KEYS[first_difference]]
+            assert f"ranks first on {label_word}" in result["explanation"], (left, right)
+
+
+def test_the_safety_gate_comes_first_and_lists_the_excluded_routes_worst_first():
+    result = recommend([entry("A", nt=20, sev=0, duration=100), entry("B", sev=50, duration=9000),
+                        entry("C", nt=45)])
+    cmp = result["comparison"]
+    assert result["route_id"] == "B"  # more Severe miles, but the only route without No Travel
+    assert cmp["excluded"] == [
+        {"id": "C", "label": "C", "no_travel_mi": 45.0},
+        {"id": "A", "label": "A", "no_travel_mi": 20.0},
+    ]
+    assert cmp["trail"] == [] and cmp["runner_up_id"] is None  # no second safe route to compare
+
+
+def test_the_trail_compares_only_routes_that_passed_the_gate():
+    result = recommend([entry("A", nt=10, sev=0), entry("B", sev=5), entry("C", sev=9)])
+    cmp = result["comparison"]
+    assert result["route_id"] == "B" and cmp["runner_up_id"] == "C"
+    assert [e["id"] for e in cmp["excluded"]] == ["A"]
+    assert outcomes(result)[0] == "decisive"
+
+
+def test_no_safe_route_lists_every_route_as_excluded_and_has_no_trail():
+    result = recommend([entry("A", nt=30), entry("B", nt=10)])
+    cmp = result["comparison"]
+    assert result["route_id"] is None
+    assert [e["id"] for e in cmp["excluded"]] == ["A", "B"]
+    assert cmp["trail"] == [] and cmp["runner_up_id"] is None
+
+
+def test_single_route_and_no_routes():
+    single = recommend([entry("A")])["comparison"]
+    assert single == {"runner_up_id": None, "runner_up_label": None, "trail": [], "excluded": []}
+    assert recommend([])["comparison"] is None

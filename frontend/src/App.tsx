@@ -3,6 +3,7 @@ import './App.css'
 import { analyzeTrip } from './api'
 import CheckpointTable from './components/CheckpointTable'
 import MapView from './components/MapView'
+import RecommendationWhy from './components/RecommendationWhy'
 import RouteList from './components/RouteList'
 import TripForm from './components/TripForm'
 import WeatherSourceBanner from './components/WeatherSourceBanner'
@@ -79,6 +80,7 @@ export default function App() {
               </strong>
               {result.recommendation.explanation}
             </p>
+            <RecommendationWhy recommendation={result.recommendation} routes={result.routes} />
             {visibleWarnings(result).map((w) => (
               <p key={w} className="banner warn">
                 {w}

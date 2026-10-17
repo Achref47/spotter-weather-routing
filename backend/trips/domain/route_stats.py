@@ -19,6 +19,9 @@ from dataclasses import dataclass
 from .risk import Level
 
 CRITERIA = ("No Travel miles", "Severe miles", "High miles", "average risk", "travel time")
+# The four ranking criteria after the No Travel gate, in the required order (ranking_key[1:5]).
+CRITERIA_KEYS = ("severe_miles", "high_miles", "average_risk", "travel_time")
+CRITERIA_LABELS = ("Fewest Severe miles", "Fewest High miles", "Lowest average risk", "Shortest travel time")
 
 
 @dataclass(frozen=True)
@@ -87,30 +90,86 @@ def ranking_key(stats: RouteStats, duration_s: float) -> tuple:
     )
 
 
-def _describe(index: int, entry: dict) -> str:
-    s = entry["stats"]
-    if index == 1:
-        return f"{s.severe_mi:.1f} mi"
-    if index == 2:
-        return f"{s.high_mi:.1f} mi"
+def _hours(seconds: float) -> str:
+    return f"{seconds / 3600:.1f} h"
+
+
+def _clock(seconds: float, with_seconds: bool = False) -> str:
+    whole = round(seconds)
+    h, rest = divmod(whole, 3600)
+    m, sec = divmod(rest, 60)
+    return f"{h} h {m:02d} min {sec:02d} s" if with_seconds else f"{h} h {m:02d} min"
+
+
+def _pair_text(index: int, a: dict, b: dict) -> tuple:
+    """Display text for one criterion of two routes. Adds precision until two values that rank
+    differently no longer look identical (so a decisive step never reads "0.0 mi vs 0.0 mi")."""
+    sa, sb = a["stats"], b["stats"]
+    if index in (1, 2):
+        va, vb = (sa.severe_mi, sb.severe_mi) if index == 1 else (sa.high_mi, sb.high_mi)
+        for digits in (1, 2, 3):
+            ta, tb = f"{va:.{digits}f} mi", f"{vb:.{digits}f} mi"
+            if ta != tb or va == vb:
+                break
+        return ta, tb
     if index == 3:
-        return "n/a" if s.avg_risk is None else f"{s.avg_risk:.2f}"
-    return f"{entry['duration_s'] / 3600:.1f} h"
+        if sa.avg_risk is None or sb.avg_risk is None:
+            return ("n/a" if sa.avg_risk is None else f"{sa.avg_risk:.2f}",
+                    "n/a" if sb.avg_risk is None else f"{sb.avg_risk:.2f}")
+        for digits in (2, 3, 4):
+            ta, tb = f"{sa.avg_risk:.{digits}f}", f"{sb.avg_risk:.{digits}f}"
+            if ta != tb or sa.avg_risk == sb.avg_risk:
+                break
+        return ta, tb
+    da, db = a["duration_s"], b["duration_s"]
+    ta, tb = _hours(da), _hours(db)
+    if ta == tb and round(da) != round(db):
+        ta, tb = _clock(da), _clock(db)
+    if ta == tb and round(da) != round(db):
+        ta, tb = _clock(da, True), _clock(db, True)
+    return ta, tb
+
+
+def _excluded(entries) -> list:
+    """Routes the No Travel safety gate removes from the running, worst first."""
+    hit = [e for e in entries if e["stats"].no_travel_mi > 0]
+    hit.sort(key=lambda e: -e["stats"].no_travel_mi)
+    return [{"id": e["id"], "label": e["label"], "no_travel_mi": round(e["stats"].no_travel_mi, 1)}
+            for e in hit]
+
+
+def _trail(best: dict, second: dict, decisive) -> list:
+    """The four criteria in order, for best vs runner-up: tied, decisive, or not needed."""
+    steps = []
+    for i in range(1, 5):
+        best_text, second_text = _pair_text(i, best, second)
+        if decisive is None or i < decisive:
+            outcome = "tied"
+        elif i == decisive:
+            outcome = "decisive"
+        else:
+            outcome = "not_needed"
+        steps.append({"key": CRITERIA_KEYS[i - 1], "label": CRITERIA_LABELS[i - 1],
+                      "best": best_text, "runner_up": second_text, "outcome": outcome})
+    return steps
 
 
 def recommend(entries) -> dict:
     """entries: dicts with id, label, stats (RouteStats), duration_s, optional incomplete.
 
-    Returns route_id (None when there is no safe route), status, explanation, ranking.
+    Returns route_id (None when there is no safe route), status, explanation, ranking, and a
+    structured comparison: the routes the safety gate excluded, and for the best versus the
+    runner-up route a trail through the four ranking criteria in order.
     """
     if not entries:
         return {"route_id": None, "status": "no_routes",
-                "explanation": "No routes were available.", "ranking": []}
+                "explanation": "No routes were available.", "ranking": [], "comparison": None}
 
     ordered = sorted(entries, key=lambda e: ranking_key(e["stats"], e["duration_s"]))
     ranking = [e["id"] for e in ordered]
     incomplete = any(e["stats"].unknown_mi > 0 or e.get("incomplete", False) for e in entries)
     note = " Some forecast data was unavailable, so this is based on incomplete data." if incomplete else ""
+    excluded = _excluded(entries)
 
     safe = [e for e in ordered if e["stats"].no_travel_mi <= 0]
     if not safe:
@@ -120,10 +179,14 @@ def recommend(entries) -> dict:
             f"time. {least['label']} is least affected ({least['stats'].no_travel_mi:.1f} No "
             "Travel mi). Consider delaying departure."
         )
-        return {"route_id": None, "status": "no_safe_route",
-                "explanation": text + note, "ranking": ranking}
+        return {"route_id": None, "status": "no_safe_route", "explanation": text + note,
+                "ranking": ranking,
+                "comparison": {"runner_up_id": None, "runner_up_label": None, "trail": [],
+                               "excluded": excluded}}
 
     best = safe[0]
+    second = None
+    trail = []
     if len(entries) == 1:
         why = f"{best['label']} is the only route found."
     elif len(safe) == 1:
@@ -133,20 +196,26 @@ def recommend(entries) -> dict:
         k1 = ranking_key(best["stats"], best["duration_s"])
         k2 = ranking_key(second["stats"], second["duration_s"])
         idx = next((i for i in range(1, 5) if k1[i] != k2[i]), None)
+        trail = _trail(best, second, idx)
         if idx is None:
             why = (f"{best['label']} ties with the other routes on every criterion, "
                    "so the first listed route was chosen.")
         else:
-            why = (f"{best['label']} ranks first on {CRITERIA[idx]} "
-                   f"({_describe(idx, best)} vs {_describe(idx, second)}).")
+            a, b = _pair_text(idx, best, second)
+            why = f"{best['label']} ranks first on {CRITERIA[idx]} ({a} vs {b})."
 
-    excluded = len(entries) - len(safe)
     if excluded:
-        why += f" {excluded} route(s) with No Travel conditions were excluded."
+        why += f" {len(excluded)} route(s) with No Travel conditions were excluded."
 
     return {
         "route_id": best["id"],
         "status": "incomplete_data" if incomplete else "recommended",
         "explanation": why + note,
         "ranking": ranking,
+        "comparison": {
+            "runner_up_id": second["id"] if second else None,
+            "runner_up_label": second["label"] if second else None,
+            "trail": trail,
+            "excluded": excluded,
+        },
     }

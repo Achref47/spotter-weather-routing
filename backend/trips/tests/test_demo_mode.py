@@ -136,3 +136,11 @@ def test_the_demo_is_repeatable():
     second = post().json()
     for key in ("routes", "recommendation", "heatmap", "weather_source", "demo", "warnings"):
         assert first[key] == second[key]
+
+
+def test_the_demo_comparison_lists_the_routes_the_storm_pushed_out_of_the_running():
+    body = post().json()
+    cmp = body["recommendation"]["comparison"]
+    assert body["recommendation"]["route_id"] == "route-2"
+    assert [e["id"] for e in cmp["excluded"]] == ["route-1"]
+    assert cmp["excluded"][0]["no_travel_mi"] == body["routes"][0]["summary"]["no_travel_mi"]

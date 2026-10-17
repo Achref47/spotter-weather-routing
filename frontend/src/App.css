@@ -528,7 +528,8 @@
   border-radius: 999px;
 }
 
-.demo-button {
+/* Two classes, so it beats the generic .trip-form button style and stays visibly secondary. */
+.trip-form .demo-button {
   padding: 9px;
   color: var(--text);
   background: transparent;
@@ -537,7 +538,7 @@
   cursor: pointer;
 }
 
-.demo-button:disabled {
+.trip-form .demo-button:disabled {
   opacity: 0.6;
   cursor: wait;
 }
@@ -609,4 +610,80 @@
     white-space: normal;
     text-align: center;
   }
+}
+
+.why {
+  margin: 8px 0 0;
+  padding: 8px 12px 10px;
+  font-size: 0.82rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.why summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.why p {
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
+
+.why .why-gate {
+  color: var(--muted);
+}
+
+.why-steps {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0 0 0 20px;
+}
+
+.why-step {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.why-step .why-label {
+  grid-column: 1;
+}
+
+.why-step .why-values {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.why-step .why-outcome {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.why-step.decisive {
+  background: rgba(47, 129, 247, 0.16);
+  border-left: 3px solid var(--accent);
+}
+
+.why-step.decisive .why-label,
+.why-step.decisive .why-outcome {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.why-step.not_needed {
+  opacity: 0.6;
+}
+
+.why-vs {
+  margin: 0 2px;
+  font-size: 0.7rem;
 }

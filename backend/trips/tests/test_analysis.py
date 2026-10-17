@@ -177,3 +177,23 @@ def test_drawn_line_is_simplified_but_checkpoints_use_the_full_route(monkeypatch
     assert [(c["lat"], c["lon"]) for c in route["checkpoints"]] == [
         (round(c.lat, 5), round(c.lon, 5)) for c in expected
     ]
+
+
+def test_recommendation_carries_a_comparison_that_matches_the_explanation(monkeypatch):
+    body = run(monkeypatch, fake_weather()).json()
+    rec = body["recommendation"]
+    cmp = rec["comparison"]
+    assert rec["route_id"] == "route-1" and cmp["runner_up_id"] == "route-2"
+    assert [s["key"] for s in cmp["trail"]] == ["severe_miles", "high_miles", "average_risk", "travel_time"]
+    assert [s["outcome"] for s in cmp["trail"]] == ["tied", "tied", "tied", "decisive"]
+    assert cmp["excluded"] == []
+    assert "travel time" in rec["explanation"]
+
+
+def test_comparison_names_the_route_the_safety_gate_excluded(monkeypatch):
+    body = run(monkeypatch, fake_weather(route2_wind=50.0), load=42000).json()
+    cmp = body["recommendation"]["comparison"]
+    assert body["recommendation"]["route_id"] == "route-1"
+    assert [e["id"] for e in cmp["excluded"]] == ["route-2"]
+    assert cmp["excluded"][0]["no_travel_mi"] > 0
+    assert cmp["trail"] == []  # only one route passed the gate, so there is nobody to compare it with

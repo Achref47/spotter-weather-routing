@@ -158,6 +158,7 @@ def analyze_trip(data: dict) -> dict:
             "route_id": rec["route_id"],
             "status": rec["status"],
             "explanation": rec["explanation"],
+            "comparison": rec["comparison"],
         },
         "heatmap": build_heatmap(corridor, heatmap_series, departure, load_lb),
         "warnings": warnings,
