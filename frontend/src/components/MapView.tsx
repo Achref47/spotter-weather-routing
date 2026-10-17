@@ -15,6 +15,7 @@ import { riskColor } from '../lib/format'
 import { heatmapCollection } from '../lib/heatmap'
 import { addHeatmapLayer, applyHeatmapHour, HEATMAP_SOURCE } from '../lib/heatmapStyle'
 import { LOADING_TEXT, mapMessage } from '../lib/messages'
+import { SIMULATED_BADGE } from '../lib/weatherSource'
 import {
   checkpointProperties,
   checkpointsCollection,
@@ -46,6 +47,7 @@ interface Props {
   loading: boolean
   failed: boolean
   focus: FocusRequest | null
+  simulated: boolean
 }
 
 function openPopup(map: MapLibreMap, properties: Record<string, unknown>, lngLat: [number, number]): Popup {
@@ -142,7 +144,15 @@ function applySelection(map: MapLibreMap, selectedId: string | null) {
   ])
 }
 
-export default function MapView({ result, selectedId, onSelect, loading, failed, focus }: Props) {
+export default function MapView({
+  result,
+  selectedId,
+  onSelect,
+  loading,
+  failed,
+  focus,
+  simulated,
+}: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const markers = useRef<Marker[]>([])
@@ -318,8 +328,10 @@ export default function MapView({ result, selectedId, onSelect, loading, failed,
           onHour={(h) => setHeatHour({ forResult: result, hour: h })}
           visible={heatVisible}
           onVisible={setHeatVisible}
+          simulated={simulated}
         />
       )}
+      {simulated && !loading && <div className="map-badge">{SIMULATED_BADGE}</div>}
       {message && !loading && <div className="map-hint">{message}</div>}
       {loading && (
         <div className="map-loading" aria-hidden="true">

@@ -1,4 +1,5 @@
 import { clampHour, hourClock, hourOffsetLabel } from '../lib/heatmap'
+import { heatmapNote } from '../lib/weatherSource'
 import type { Heatmap } from '../types'
 
 interface Props {
@@ -7,10 +8,11 @@ interface Props {
   onHour: (hour: number) => void
   visible: boolean
   onVisible: (visible: boolean) => void
+  simulated: boolean
 }
 
 /** The 0 to 48 hour forecast slider. Moving it never calls the server. */
-export default function HeatmapControl({ heatmap, hour, onHour, visible, onVisible }: Props) {
+export default function HeatmapControl({ heatmap, hour, onHour, visible, onVisible, simulated }: Props) {
   const clock = hourClock(heatmap.start_time, hour)
   const offset = hourOffsetLabel(hour)
 
@@ -42,11 +44,7 @@ export default function HeatmapControl({ heatmap, hour, onHour, visible, onVisib
         <span>Departure</span>
         <span>+{heatmap.hours} h</span>
       </div>
-      <p className="heat-note">
-        Forecast risk along the corridor at departure + {offset.replace('+', '')} (your local time),
-        for your load weight. It is not tied to where the truck is: checkpoint risk on the route
-        cards uses each route’s own arrival times.
-      </p>
+      <p className="heat-note">{heatmapNote(hour, simulated)}</p>
     </section>
   )
 }

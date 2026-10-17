@@ -76,12 +76,22 @@ export interface Heatmap {
   points: HeatmapPoint[]
 }
 
+/** Describes the simulated storm. Present only when weather_source is "demo". */
+export interface DemoInfo {
+  id: string
+  label: string
+  description: string
+  how_to_read: string[]
+}
+
 export interface AnalyzeResponse {
   origin: Place
   destination: Place
   departure_time: string
   load_weight_lb: number
   checkpoint_interval_mi: number
+  weather_source: 'live' | 'demo'
+  demo: DemoInfo | null
   routes: Route[]
   recommendation: Recommendation
   heatmap: Heatmap
@@ -100,4 +110,6 @@ export interface AnalyzeRequest {
   departure_time: string
   load_weight_lb: number
   checkpoint_interval_mi: Interval
+  /** Leave out for a normal live analysis. "storm" asks for the simulated demo. */
+  demo_scenario?: 'storm'
 }

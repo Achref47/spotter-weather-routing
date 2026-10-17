@@ -527,3 +527,86 @@
   font-weight: 600;
   border-radius: 999px;
 }
+
+.demo-button {
+  padding: 9px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.demo-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.demo-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.source-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.banner.demo {
+  border-color: #f0883e;
+  background: rgba(240, 136, 62, 0.12);
+}
+
+.banner.demo p {
+  margin: 0 0 6px;
+}
+
+.banner.demo .demo-title {
+  color: #ffb877;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.banner.demo ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.banner.demo li + li {
+  margin-top: 4px;
+}
+
+.map-badge {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 1;
+  padding: 6px 12px;
+  color: #111111;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  background: #f0883e;
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+/* The badge takes the top-centre spot, so a map message moves just under it. */
+.map-badge + .map-hint {
+  top: 52px;
+}
+
+@media (max-width: 800px) {
+  .map-badge {
+    top: 8px;
+    max-width: calc(100% - 210px);
+    white-space: normal;
+    text-align: center;
+  }
+}

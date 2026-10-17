@@ -1,6 +1,7 @@
 """Orchestrate one trip analysis: geocode, route, checkpoints, weather, risk, ranking, heatmap."""
 from datetime import datetime, timedelta, timezone
 
+from trips.domain import demo_weather
 from trips.domain.checkpoints import METERS_PER_MILE, generate_checkpoints
 from trips.domain.geometry import simplify_line
 from trips.domain.heatmap import HEATMAP_HOURS, build_heatmap, sample_corridor
@@ -35,6 +36,19 @@ def _risk_payload(a):
     }
 
 
+def _weather_series(scenario, planned, points, departure, last_needed):
+    """Hourly weather for every point: the live forecast, unless a demo was explicitly requested.
+
+    The two sources never mix, and a demo never calls the weather service.
+    """
+    if scenario == demo_weather.STORM_ID:
+        fastest = planned[0][0]  # route options are ordered fastest first
+        storm = demo_weather.storm_for_route(fastest.coords, fastest.duration_s)
+        return demo_weather.demo_series(points, departure, last_needed, storm)
+    days = forecast_days_for(last_needed, datetime.now(timezone.utc))
+    return series_for_points(points, days)
+
+
 def analyze_trip(data: dict) -> dict:
     origin = geocode(data["origin"])
     destination = geocode(data["destination"])
@@ -42,6 +56,7 @@ def analyze_trip(data: dict) -> dict:
     departure = data["departure_time"]  # timezone-aware, UTC
     load_lb = data["load_weight_lb"]
     interval = data["checkpoint_interval_mi"]
+    scenario = data.get("demo_scenario")  # None for a normal, live analysis
 
     planned = []
     for cand in options:
@@ -54,8 +69,7 @@ def analyze_trip(data: dict) -> dict:
     checkpoint_points = [(c.lat, c.lon) for _, cps in planned for c in cps]
     last_eta = max(c.eta for _, cps in planned for c in cps)
     last_needed = max(last_eta + timedelta(hours=1), departure + timedelta(hours=HEATMAP_HOURS + 1))
-    days = forecast_days_for(last_needed, datetime.now(timezone.utc))
-    all_series = series_for_points(checkpoint_points + corridor, days)
+    all_series = _weather_series(scenario, planned, checkpoint_points + corridor, departure, last_needed)
     checkpoint_series = iter(all_series[: len(checkpoint_points)])
     heatmap_series = all_series[len(checkpoint_points):]
 
@@ -124,6 +138,8 @@ def analyze_trip(data: dict) -> dict:
         route["rank"] = rec["ranking"].index(route["id"]) + 1
 
     warnings = []
+    if scenario:
+        warnings.append(demo_weather.LABEL + ". Do not use it to judge real conditions.")
     if len(routes) < 3:
         warnings.append(f"Only {len(routes)} distinct route(s) could be found for this trip.")
     if any(e["incomplete"] for e in entries):
@@ -135,6 +151,8 @@ def analyze_trip(data: dict) -> dict:
         "departure_time": departure.isoformat(),
         "load_weight_lb": load_lb,
         "checkpoint_interval_mi": interval,
+        "weather_source": "demo" if scenario else "live",
+        "demo": demo_weather.describe() if scenario else None,
         "routes": routes,
         "recommendation": {
             "route_id": rec["route_id"],

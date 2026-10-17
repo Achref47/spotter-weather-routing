@@ -1,24 +1,26 @@
 import { checkpointKey, etaShort, formatMile, formatReading } from '../lib/checkpoints'
+import { checkpointHeading } from '../lib/weatherSource'
 import { RISK_TEXT_COLOR, riskColor } from '../lib/format'
 import type { Checkpoint, Route } from '../types'
 
 interface Props {
   route: Route
+  simulated: boolean
   focusedKey: string | null
   onFocus: (route: Route, checkpoint: Checkpoint) => void
 }
 
 /** Every weather checkpoint of the selected route. Clicking a mile zooms the map to it. */
-export default function CheckpointTable({ route, focusedKey, onFocus }: Props) {
+export default function CheckpointTable({ route, simulated, focusedKey, onFocus }: Props) {
   return (
     <section className="cp-table" aria-labelledby="cp-table-title">
       <h2 id="cp-table-title">
-        Checkpoints · {route.label}
+        {checkpointHeading(route.label, simulated)}
         <span className="cp-count">{route.checkpoints.length}</span>
       </h2>
       <p className="cp-hint">
-        Forecast at each checkpoint for the time this route reaches it. Choose a mile to zoom the map
-        there.
+        {simulated ? 'Simulated weather' : 'Forecast'} at each checkpoint for the time this route
+        reaches it. Choose a mile to zoom the map there.
       </p>
       <div className="cp-scroll" role="region" aria-label="Checkpoint table" tabIndex={0}>
         <table>

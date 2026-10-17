@@ -14,6 +14,8 @@ class AnalyzeRequestSerializer(serializers.Serializer):
     departure_time = serializers.CharField()
     load_weight_lb = serializers.FloatField(min_value=0, max_value=MAX_LOAD_LB)
     checkpoint_interval_mi = serializers.ChoiceField(choices=[10, 25, 50], default=25)
+    # Absent or null means a normal live analysis. "storm" asks for the simulated demo.
+    demo_scenario = serializers.ChoiceField(choices=["storm"], allow_null=True, default=None)
 
     def validate_load_weight_lb(self, value):
         if not math.isfinite(value):

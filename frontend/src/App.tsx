@@ -5,8 +5,10 @@ import CheckpointTable from './components/CheckpointTable'
 import MapView from './components/MapView'
 import RouteList from './components/RouteList'
 import TripForm from './components/TripForm'
+import WeatherSourceBanner from './components/WeatherSourceBanner'
 import { checkpointKey } from './lib/checkpoints'
 import { LOADING_TEXT } from './lib/messages'
+import { isSimulated, visibleWarnings } from './lib/weatherSource'
 import type { AnalyzeRequest, AnalyzeResponse, Checkpoint, FocusRequest, Route } from './types'
 
 const BANNER_CLASS: Record<string, string> = {
@@ -49,6 +51,7 @@ export default function App() {
   }
 
   const selectedRoute = result?.routes.find((r) => r.id === selectedId) ?? null
+  const simulated = isSimulated(result)
 
   return (
     <div className="app">
@@ -69,13 +72,14 @@ export default function App() {
 
         {result && !loading && (
           <>
+            <WeatherSourceBanner result={result} />
             <p className={`banner ${BANNER_CLASS[result.recommendation.status] ?? 'info'}`}>
               <strong>
                 {result.recommendation.status === 'no_safe_route' ? 'No safe route available. ' : ''}
               </strong>
               {result.recommendation.explanation}
             </p>
-            {result.warnings.map((w) => (
+            {visibleWarnings(result).map((w) => (
               <p key={w} className="banner warn">
                 {w}
               </p>
@@ -89,6 +93,7 @@ export default function App() {
             {selectedRoute && (
               <CheckpointTable
                 route={selectedRoute}
+                simulated={simulated}
                 focusedKey={focus ? checkpointKey(focus.routeId, focus.mile) : null}
                 onFocus={focusCheckpoint}
               />
@@ -116,6 +121,7 @@ export default function App() {
           loading={loading}
           failed={error !== null}
           focus={focus}
+          simulated={simulated}
         />
       </main>
     </div>

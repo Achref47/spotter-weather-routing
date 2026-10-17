@@ -18,6 +18,10 @@ export default function TripForm({ onSubmit, loading }: Props) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    submit(undefined) // the normal button always runs a live analysis
+  }
+
+  function submit(demo: 'storm' | undefined) {
     const when = new Date(departure)
     const load = Number(loadLb)
 
@@ -41,6 +45,7 @@ export default function TripForm({ onSubmit, loading }: Props) {
       departure_time: when.toISOString().replace(/\.\d{3}Z$/, 'Z'),
       load_weight_lb: load,
       checkpoint_interval_mi: interval,
+      demo_scenario: demo,
     })
   }
 
@@ -92,6 +97,19 @@ export default function TripForm({ onSubmit, loading }: Props) {
       <button type="submit" disabled={loading}>
         {loading ? 'Analyzing…' : 'Compare routes'}
       </button>
+      <button
+        type="button"
+        className="demo-button"
+        disabled={loading}
+        aria-describedby="demo-note"
+        onClick={() => submit('storm')}
+      >
+        Run simulated storm demo
+      </button>
+      <p id="demo-note" className="demo-note">
+        “Compare routes” uses the live forecast. The demo lays a simulated storm over your routes
+        and is always labeled as simulated.
+      </p>
     </form>
   )
 }
