@@ -27,8 +27,14 @@ test('400 uses the validation details', () => {
   assert.equal(messageForResponse(400, null), 'Please check your input.')
 })
 
-test('429 asks the user to wait, whatever the body says', () => {
+test('429 shows the server’s own wait time when it sends one', () => {
+  const error = 'Too many analyses in a short time. Please wait 45 seconds and try again.'
+  assert.equal(messageForResponse(429, { error, retry_after_s: 45 }), error)
+})
+
+test('429 without a usable body still asks the user to wait', () => {
   assert.match(messageForResponse(429, { detail: 'Request was throttled.' }), /Too many requests/)
+  assert.match(messageForResponse(429, { error: '  ' }), /wait a minute/)
   assert.match(messageForResponse(429, null), /wait a minute/)
 })
 

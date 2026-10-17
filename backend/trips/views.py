@@ -1,9 +1,10 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, throttle_classes
 from rest_framework.response import Response
 
 from .errors import TripError
 from .serializers import AnalyzeRequestSerializer
 from .services.analysis import analyze_trip
+from .throttling import AnalyzeBurstThrottle, AnalyzeSustainedThrottle
 
 
 @api_view(["GET"])
@@ -12,6 +13,7 @@ def health(request):
 
 
 @api_view(["POST"])
+@throttle_classes([AnalyzeBurstThrottle, AnalyzeSustainedThrottle])
 def analyze(request):
     serializer = AnalyzeRequestSerializer(data=request.data)
     if not serializer.is_valid():

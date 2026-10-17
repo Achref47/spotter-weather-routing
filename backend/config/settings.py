@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 from dotenv import load_dotenv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -129,9 +130,21 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = ["http://localhost:5173"]
 
 
+# Per-client limits on POST /api/trips/analyze (see trips/throttling.py for the reasoning).
+# Change them without code through ANALYZE_RATE_BURST / ANALYZE_RATE_HOUR, e.g. "20/min".
+ANALYZE_THROTTLE_RATES = {
+    "analyze_burst": os.environ.get("ANALYZE_RATE_BURST", "10/min"),
+    "analyze_hour": os.environ.get("ANALYZE_RATE_HOUR", "30/hour"),
+}
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": [],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "UNAUTHENTICATED_USER": None,
+    "EXCEPTION_HANDLER": "trips.throttling.api_exception_handler",
+    # How many proxies sit in front of the app. 0 (local) means "use the connecting address".
+    # Behind a host's proxy set NUM_PROXIES=1 so the real client address is read from
+    # X-Forwarded-For; otherwise every visitor would share one throttle bucket.
+    "NUM_PROXIES": int(os.environ.get("NUM_PROXIES", "0")),
 }
