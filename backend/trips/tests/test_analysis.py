@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -154,3 +155,25 @@ def test_heatmap_marks_strong_wind_as_no_travel_where_it_blows(monkeypatch):
     assert second and first
     assert all(set(p["levels"]) == {4} for p in second)
     assert all(set(p["levels"]) == {0} for p in first)
+
+def test_drawn_line_is_simplified_but_checkpoints_use_the_full_route(monkeypatch):
+    from datetime import datetime
+
+    from trips.domain.checkpoints import generate_checkpoints
+
+    curve = [[i / 100, 0.05 * math.sin(i / 8)] for i in range(101)]  # 101 points, gently curved
+    candidate = Candidate("Fastest route", "alternative", 111_000.0, 3600.0, curve)
+    monkeypatch.setattr(analysis, "get_route_options", lambda o, d: [candidate])
+
+    body = run(monkeypatch, fake_weather()).json()
+    route = body["routes"][0]
+
+    drawn = route["geometry"]["coordinates"]
+    assert 2 < len(drawn) < len(curve)
+    assert drawn[0] == [0.0, 0.0] and drawn[-1] == [1.0, round(0.05 * math.sin(100 / 8), 5)]
+
+    departure = datetime.fromisoformat(body["departure_time"])
+    expected = generate_checkpoints(curve, 111_000.0, 3600.0, departure, 25)
+    assert [(c["lat"], c["lon"]) for c in route["checkpoints"]] == [
+        (round(c.lat, 5), round(c.lon, 5)) for c in expected
+    ]

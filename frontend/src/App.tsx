@@ -90,7 +90,13 @@ export default function App() {
       </aside>
 
       <main className="map-area">
-        <MapView result={result} selectedId={selectedId} onSelect={setSelectedId} />
+        <MapView
+          result={result}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          loading={loading}
+          failed={error !== null}
+        />
       </main>
     </div>
   )

@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta, timezone
 
 from trips.domain.checkpoints import METERS_PER_MILE, generate_checkpoints
+from trips.domain.geometry import simplify_line
 from trips.domain.heatmap import HEATMAP_HOURS, build_heatmap, sample_corridor
 from trips.domain.risk import assess
 from trips.domain.route_stats import compute_stats, recommend
@@ -11,6 +12,7 @@ from trips.services.routing import get_route_options
 from trips.services.weather import forecast_days_for, series_for_points
 
 MAX_HEATMAP_POINTS = 80  # keeps weather lookups (and the response size) bounded
+DRAWN_LINE_TOLERANCE_M = 10  # only the line sent to the browser is simplified (about 1 px at zoom 14)
 
 
 def _round(value, digits):
@@ -99,7 +101,10 @@ def analyze_trip(data: dict) -> dict:
                 "distance_mi": round(cand.distance_m / METERS_PER_MILE, 1),
                 "duration_s": round(cand.duration_s),
                 "arrival_time": (departure + timedelta(seconds=cand.duration_s)).isoformat(),
-                "geometry": {"type": "LineString", "coordinates": cand.coords},
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": simplify_line(cand.coords, DRAWN_LINE_TOLERANCE_M),
+                },
                 "checkpoints": checkpoint_payloads,
                 "summary": {
                     "low_mi": _round(stats.low_mi, 1),

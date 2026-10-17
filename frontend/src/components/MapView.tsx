@@ -7,7 +7,7 @@ import {
     setWorkerUrl,
     type GeoJSONSource,
 } from 'maplibre-gl'
-   import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { Point } from 'geojson'
 import { useEffect, useRef, useState } from 'react'
@@ -38,6 +38,18 @@ interface Props {
   result: AnalyzeResponse | null
   selectedId: string | null
   onSelect: (id: string) => void
+  loading: boolean
+  failed: boolean
+}
+
+/** The message shown over the map when there is nothing to draw, or something to flag. */
+function mapMessage(result: AnalyzeResponse | null, failed: boolean): string | null {
+  if (failed) return 'The trip could not be analyzed. Fix the problem on the left and try again.'
+  if (!result) return 'Enter a trip and click “Compare routes”.'
+  if (result.recommendation.status === 'no_safe_route') {
+    return 'No safe route: every route has No Travel conditions at this departure time.'
+  }
+  return null
 }
 
 function pin(label: 'A' | 'B', place: Place): HTMLElement {
@@ -47,6 +59,11 @@ function pin(label: 'A' | 'B', place: Place): HTMLElement {
   el.title = place.label
   return el
 }
+
+// Checkpoints can be only ~19 px apart on screen, so dots get a tight hit area. Any larger and
+// the dots would cover the route lines, and clicking a line to select it would never work.
+const DOT_HIT_PAD = 2
+const ROUTE_HIT_PAD = 8
 
 function hitBox(point: { x: number; y: number }, pad: number): [[number, number], [number, number]] {
   return [
@@ -121,16 +138,18 @@ function applySelection(map: MapLibreMap, selectedId: string | null) {
   ])
 }
 
-export default function MapView({ result, selectedId, onSelect }: Props) {
+export default function MapView({ result, selectedId, onSelect, loading, failed }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const markers = useRef<Marker[]>([])
   const onSelectRef = useRef(onSelect)
+  const selectedRef = useRef(selectedId)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
     onSelectRef.current = onSelect
-  }, [onSelect])
+    selectedRef.current = selectedId
+  }, [onSelect, selectedId])
 
   // Create the map once.
   useEffect(() => {
@@ -157,8 +176,16 @@ export default function MapView({ result, selectedId, onSelect }: Props) {
 
     map.on('click', (e) => {
       if (!map.getLayer('checkpoints')) return
-      const checkpoint = map.queryRenderedFeatures(hitBox(e.point, 7), { layers: ['checkpoints'] })[0]
+      const checkpoint = map.queryRenderedFeatures(hitBox(e.point, DOT_HIT_PAD), {
+        layers: ['checkpoints'],
+      })[0]
       if (checkpoint) {
+        // A dot of another route selects that route; a dot of the selected route shows its details.
+        const routeId = String(checkpoint.properties?.routeId)
+        if (routeId !== selectedRef.current) {
+          onSelectRef.current(routeId)
+          return
+        }
         const [lon, lat] = (checkpoint.geometry as Point).coordinates
         new Popup({ maxWidth: '280px' })
           .setLngLat([lon, lat])
@@ -166,19 +193,24 @@ export default function MapView({ result, selectedId, onSelect }: Props) {
           .addTo(map)
         return
       }
-      const route = map.queryRenderedFeatures(hitBox(e.point, 8), { layers: ['routes-other'] })[0]
+      const route = map.queryRenderedFeatures(hitBox(e.point, ROUTE_HIT_PAD), {
+        layers: ['routes-other'],
+      })[0]
       if (route) onSelectRef.current(String(route.properties?.id))
     })
     map.on('error', (e) => {
       console.error('MapLibre error:', e.error?.message ?? e)
     })
-    
+
     map.on('mousemove', (e) => {
       if (!map.getLayer('checkpoints')) return
-      const hit = map.queryRenderedFeatures(hitBox(e.point, 6), {
-        layers: ['checkpoints', 'routes-other'],
+      const overDot = map.queryRenderedFeatures(hitBox(e.point, DOT_HIT_PAD), {
+        layers: ['checkpoints'],
       })
-      map.getCanvas().style.cursor = hit.length > 0 ? 'pointer' : ''
+      const overRoute = map.queryRenderedFeatures(hitBox(e.point, ROUTE_HIT_PAD), {
+        layers: ['routes-other'],
+      })
+      map.getCanvas().style.cursor = overDot.length + overRoute.length > 0 ? 'pointer' : ''
     })
 
     mapRef.current = map
@@ -223,6 +255,8 @@ export default function MapView({ result, selectedId, onSelect }: Props) {
     applySelection(map, selectedId)
   }, [ready, selectedId])
 
+  const message = mapMessage(result, failed)
+
   return (
     <>
       <div className="map-canvas" ref={container} aria-label="Route map" />
@@ -234,7 +268,13 @@ export default function MapView({ result, selectedId, onSelect }: Props) {
           </div>
         ))}
       </div>
-      {!result && <div className="map-hint">Enter a trip and click “Compare routes”.</div>}
+      {message && !loading && <div className="map-hint">{message}</div>}
+      {loading && (
+        <div className="map-loading" aria-hidden="true">
+          <span className="spinner" />
+          Analyzing routes and weather…
+        </div>
+      )}
     </>
   )
 }
