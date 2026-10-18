@@ -20,7 +20,7 @@ BATCH_SIZE = 25
 MAX_WORKERS = 4
 TIMEOUT_S = (5, 60)  # connect, read (seconds)
 RETRY_DELAY_S = 1.5
-RETRY_STATUSES = {429, 500, 502, 503, 504}
+RETRY_STATUSES = {500, 502, 503, 504}
 CACHE_TTL_S = 1800
 CACHE_MAX_ENTRIES = 5000
 MAX_FORECAST_DAYS = 16
@@ -109,8 +109,68 @@ def _parse_location(loc) -> HourlySeries:
 def _http_status(exc):
     return getattr(getattr(exc, "response", None), "status_code", None)
 
-
 def _get_json(url: str):
+    """Fetch JSON, retrying timeouts and server errors once."""
+    for attempt in (1, 2):
+        try:
+            resp = requests.get(url, timeout=TIMEOUT_S)
+            resp.raise_for_status()
+            return resp.json()
+
+        except requests.RequestException as exc:
+            status = _http_status(exc)
+            detail = (
+                getattr(getattr(exc, "response", None), "text", "")
+                or ""
+            )
+
+            # A 429 should not be retried blindly.
+            if status == 429:
+                logger.warning(
+                    "Open-Meteo rate limit reached: %s",
+                    detail[:200],
+                )
+
+                if "daily api request limit exceeded" in detail.lower():
+                    message = (
+                        "The weather provider's daily quota is exhausted. "
+                        "Please try again after the quota resets."
+                    )
+                else:
+                    message = (
+                        "The weather service rate limit was reached. "
+                        "Please wait before retrying."
+                    )
+
+                raise WeatherError(message) from exc
+
+            retryable = (
+                isinstance(exc, requests.Timeout)
+                or status in RETRY_STATUSES
+            )
+
+            if attempt == 1 and retryable:
+                time.sleep(RETRY_DELAY_S)
+                continue
+
+            logger.warning(
+                "Open-Meteo request failed: %r %s",
+                exc,
+                detail[:200],
+            )
+            raise WeatherError(
+                "The weather service is unavailable."
+            ) from exc
+
+        except ValueError as exc:
+            logger.warning(
+                "Open-Meteo returned invalid JSON: %r",
+                exc,
+            )
+            raise WeatherError(
+                "The weather service is unavailable."
+            ) from exc
+
     """GET a URL as JSON. Retries once after a timeout, a 429 or a 5xx; nothing else."""
     for attempt in (1, 2):
         try:

@@ -88,17 +88,21 @@ def test_repeated_timeout_raises_after_one_retry(monkeypatch):
     assert len(calls) == 2
 
 
-def test_rate_limit_is_retried_once_then_succeeds(monkeypatch):
-    calls = scripted(monkeypatch, [Resp429(), OkResp()])
-    assert len(weather.series_for_points(POINT, 1)) == 1
-    assert len(calls) == 2
+def test_rate_limit_is_not_retried(monkeypatch):
+    calls = scripted(monkeypatch, [Resp429()])
 
+    with pytest.raises(WeatherError, match="rate limit"):
+        weather.series_for_points(POINT, 1)
+
+    assert len(calls) == 1
 
 def test_repeated_rate_limit_gives_a_clear_message(monkeypatch):
     calls = scripted(monkeypatch, [Resp429()])
+
     with pytest.raises(WeatherError, match="rate limit"):
         weather.series_for_points(POINT, 1)
-    assert len(calls) == 2
+
+    assert len(calls) == 1
 
 
 def test_plain_connection_error_is_not_retried(monkeypatch):
