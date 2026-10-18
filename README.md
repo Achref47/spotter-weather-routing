@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚛 Spotter: Weather-Aware Truck Routing
+#  Spotter: Weather-Aware Truck Routing
 
 **Pick the safest of three routes using the forecast at the moment the truck actually arrives, the weight of the load, and the travel time.**
 
